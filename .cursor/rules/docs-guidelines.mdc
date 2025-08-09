@@ -1,0 +1,9 @@
+---
+description: Enforce updating and adding documentation for setup and features.
+alwaysApply: true
+---
+
+- When implementing features or infrastructure, always include documentation on how to set them up and use them.  
+- Place detailed or lengthy setup instructions and guides in the `docs/` folder.  
+- Update the main `README.md` with concise, high-level summaries or links to the detailed docs.  
+- Ensure all documentation is clear, complete, and accurate for future developers.

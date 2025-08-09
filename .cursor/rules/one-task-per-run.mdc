@@ -1,0 +1,12 @@
+---
+description: Complete exactly one given task per background agent run.
+alwaysApply: true
+---
+
+When given a task to start:
+
+- Treat this as the only task for the run.  
+- Fully implement the task as described.  
+- Commit all changes and open a single pull request to the repository.  
+- Do not pick up or begin any additional tasks.  
+- After creating the PR, end the run.

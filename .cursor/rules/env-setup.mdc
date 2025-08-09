@@ -1,0 +1,10 @@
+---
+description: Specify project environment and tooling preferences.
+alwaysApply: true
+---
+
+- Use pnpm as the package manager.  
+- Use TypeScript for all source files.  
+- Use Hono framework for API routes.  
+- Follow existing project code style conventions.
+- Update the README as required but always be concise and don't add more information than is required

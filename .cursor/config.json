@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "alwaysApply": [
+      "one-task-per-run.mdc",
+      "env-setup.mdc",
+      "docs-guidelines.mdc",
+    ]
+  }
+}
