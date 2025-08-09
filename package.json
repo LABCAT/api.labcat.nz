@@ -6,15 +6,21 @@
 		"build": "vite build",
 		"preview": "vite build && wrangler pages dev",
 		"deploy": "pnpm run build && wrangler pages deploy",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings"
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"drizzle:gen": "drizzle-kit generate",
+		"drizzle:check": "drizzle-kit check",
+		"db:migrate:dev": "wrangler d1 migrations apply labcat-db --local",
+		"db:migrate:prod": "wrangler d1 migrations apply labcat-db"
 	},
 	"dependencies": {
-		"hono": "^4.9.0"
+		"hono": "^4.9.0",
+		"drizzle-orm": "^0.33.0"
 	},
 	"devDependencies": {
 		"@hono/vite-build": "^1.2.0",
 		"@hono/vite-dev-server": "^0.18.2",
 		"vite": "^6.3.5",
-		"wrangler": "^4.28.1"
+		"wrangler": "^4.28.1",
+		"drizzle-kit": "^0.24.0"
 	}
 }
