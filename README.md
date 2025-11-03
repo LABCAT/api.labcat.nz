@@ -60,3 +60,25 @@
 - **Check migration**: `pnpm run drizzle:check`
 - **Apply local migrations**: `pnpm run db:migrate:dev`
 - **Apply production migrations**: `pnpm run db:migrate:prod`
+
+## Database Inspection
+
+**View local database schema:**
+```bash
+npx wrangler d1 execute labcat-db --local --command=".schema"
+```
+
+**List all tables:**
+```bash
+npx wrangler d1 execute labcat-db --local --command=".tables"
+```
+
+**View table structure:**
+```bash
+npx wrangler d1 execute labcat-db --local --command="PRAGMA table_info(pages);"
+```
+
+**Run custom SQL queries:**
+```bash
+npx wrangler d1 execute labcat-db --local --command="SELECT * FROM pages LIMIT 5;"
+```
