@@ -48,8 +48,22 @@
    ```bash
    pnpm run db:migrate:prod
    ```
+   
+   **If you get "No migrations to apply!":**
+   ```bash
+   # Check migration status
+   npx wrangler d1 migrations list labcat_nz
+   
+   # Force apply if needed
+   npx wrangler d1 migrations apply labcat_nz --force
+   ```
 
-5. **Deploy to Cloudflare Pages**
+5. **Verify production database**
+   ```bash
+   npx wrangler d1 execute labcat_nz --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
+   ```
+
+6. **Deploy to Cloudflare Pages**
    ```bash
    pnpm run deploy
    ```
