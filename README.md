@@ -13,17 +13,12 @@
    pnpm install
    ```
 
-2. **Create local D1 database**
-   ```bash
-   npx wrangler d1 create labcat-db --local
-   ```
-
-3. **Run migrations locally**
+2. **Run migrations locally** (creates local DB automatically)
    ```bash
    pnpm run db:migrate:dev
    ```
 
-4. **Start development server**
+3. **Start development server**
    ```bash
    pnpm run dev
    ```
