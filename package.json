@@ -9,8 +9,8 @@
 		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
 		"drizzle:gen": "drizzle-kit generate",
 		"drizzle:check": "drizzle-kit check",
-		"db:migrate:dev": "wrangler d1 migrations apply labcat-db --local",
-		"db:migrate:prod": "wrangler d1 migrations apply labcat-db"
+		"db:migrate:dev": "wrangler d1 migrations apply labcat_nz --local",
+		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz"
 	},
 	"dependencies": {
 		"hono": "^4.9.0",

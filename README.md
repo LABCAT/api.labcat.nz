@@ -32,14 +32,14 @@
 
 2. **Create production D1 database**
    ```bash
-   npx wrangler d1 create labcat-db
+   npx wrangler d1 create labcat_nz
    ```
 
 3. **Update `wrangler.jsonc`** with the database ID from step 2:
    ```jsonc
    "d1_databases": [{
      "binding": "DB",
-     "database_name": "labcat-db", 
+     "database_name": "labcat_nz", 
      "database_id": "YOUR_DATABASE_ID_HERE"
    }]
    ```
@@ -65,20 +65,20 @@
 
 **View local database schema:**
 ```bash
-npx wrangler d1 execute labcat-db --local --command=".schema"
+npx wrangler d1 execute labcat_nz --local --command=".schema"
 ```
 
 **List all tables:**
 ```bash
-npx wrangler d1 execute labcat-db --local --command=".tables"
+npx wrangler d1 execute labcat_nz --local --command=".tables"
 ```
 
 **View table structure:**
 ```bash
-npx wrangler d1 execute labcat-db --local --command="PRAGMA table_info(pages);"
+npx wrangler d1 execute labcat_nz --local --command="PRAGMA table_info(pages);"
 ```
 
 **Run custom SQL queries:**
 ```bash
-npx wrangler d1 execute labcat-db --local --command="SELECT * FROM pages LIMIT 5;"
+npx wrangler d1 execute labcat_nz --local --command="SELECT * FROM pages LIMIT 5;"
 ```
