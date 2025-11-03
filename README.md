@@ -63,19 +63,19 @@
 
 ## Database Inspection
 
-**View local database schema:**
-```bash
-npx wrangler d1 execute labcat_nz --local --command=".schema"
-```
-
 **List all tables:**
 ```bash
-npx wrangler d1 execute labcat_nz --local --command=".tables"
+npx wrangler d1 execute labcat_nz --local --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-**View table structure:**
+**View table structure (example with pages table):**
 ```bash
 npx wrangler d1 execute labcat_nz --local --command="PRAGMA table_info(pages);"
+```
+
+**View all indexes:**
+```bash
+npx wrangler d1 execute labcat_nz --local --command="SELECT name, sql FROM sqlite_master WHERE type='index';"
 ```
 
 **Run custom SQL queries:**
