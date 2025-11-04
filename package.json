@@ -10,7 +10,7 @@
 		"drizzle:gen": "drizzle-kit generate",
 		"drizzle:check": "drizzle-kit check",
 		"db:migrate:dev": "wrangler d1 migrations apply labcat_nz --local",
-		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz"
+		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz --remote"
 	},
 	"dependencies": {
 		"hono": "^4.9.0",
