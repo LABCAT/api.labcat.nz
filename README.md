@@ -90,3 +90,8 @@ npx wrangler d1 execute labcat_nz --local --command="SELECT * FROM pages LIMIT 5
 # Production
 npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 5;"
 ```
+
+## Image Migration Proof of Concept
+
+- Run `pnpm migrate:audio-project-images` to copy audio project artwork into Cloudflare R2 under `audio-project/`.
+- See `docs/migrate-audio-project-images-poc.md` for setup steps, required environment variables, and troubleshooting tips.
