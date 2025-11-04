@@ -48,22 +48,8 @@
    ```bash
    pnpm run db:migrate:prod
    ```
-   
-   **If you get "No migrations to apply!":**
-   ```bash
-   # Check migration status
-   npx wrangler d1 migrations list labcat_nz
-   
-   # Force apply if needed
-   npx wrangler d1 migrations apply labcat_nz --force
-   ```
 
-5. **Verify production database**
-   ```bash
-   npx wrangler d1 execute labcat_nz --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
-   ```
-
-6. **Deploy to Cloudflare Pages**
+5. **Deploy to Cloudflare Pages**
    ```bash
    pnpm run deploy
    ```
@@ -77,22 +63,30 @@
 
 ## Database Inspection
 
-**List all tables:**
+**List all tables (local):**
 ```bash
 npx wrangler d1 execute labcat_nz --local --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-**View table structure (example with pages table):**
+**List all tables (production):**
 ```bash
-npx wrangler d1 execute labcat_nz --local --command="PRAGMA table_info(pages);"
+npx wrangler d1 execute labcat_nz --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
 ```
 
-**View all indexes:**
+**View table structure:**
 ```bash
-npx wrangler d1 execute labcat_nz --local --command="SELECT name, sql FROM sqlite_master WHERE type='index';"
+# Local
+npx wrangler d1 execute labcat_nz --local --command="PRAGMA table_info(pages);"
+
+# Production
+npx wrangler d1 execute labcat_nz --remote --command="PRAGMA table_info(pages);"
 ```
 
 **Run custom SQL queries:**
 ```bash
+# Local
 npx wrangler d1 execute labcat_nz --local --command="SELECT * FROM pages LIMIT 5;"
+
+# Production
+npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 5;"
 ```
