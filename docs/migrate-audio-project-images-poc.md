@@ -22,7 +22,15 @@ This proof of concept migrates the three audio project images exposed by the Wor
 | `R2_AUDIO_PROJECT_PREFIX` *(optional)* | Folder prefix within the bucket. Defaults to `audio-project`. |
 | `AUDIO_PROJECTS_ENDPOINT` *(optional)* | Source WordPress endpoint. Defaults to the production URL above. |
 
-Create a `.env` file or export the variables in your shell before running the migration.
+### Local config file (recommended)
+
+1. Copy `scripts/migrate-audio-project-images.config.example.ts` to `scripts/migrate-audio-project-images.config.ts`.
+2. Fill in your Cloudflare R2 credentials and any optional overrides.
+3. The real config file is git-ignored so the secrets stay on your machine.
+
+### Using environment variables
+
+The script still falls back to `process.env`. Export values in your shell if you prefer:
 
 ```bash
 export R2_ACCESS_KEY_ID="..."

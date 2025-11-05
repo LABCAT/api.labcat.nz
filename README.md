@@ -93,5 +93,5 @@ npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 
 
 ## Image Migration Proof of Concept
 
-- Run `pnpm migrate:audio-project-images` to copy audio project artwork into Cloudflare R2 under `audio-project/`.
-- See `docs/migrate-audio-project-images-poc.md` for setup steps, required environment variables, and troubleshooting tips.
+- Copy `scripts/migrate-audio-project-images.config.example.ts` to `scripts/migrate-audio-project-images.config.ts`, add your R2 credentials (file is git-ignored), then run `pnpm migrate:audio-project-images`.
+- See `docs/migrate-audio-project-images-poc.md` for detailed setup, optional environment variable usage, and troubleshooting tips.

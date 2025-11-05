@@ -2,6 +2,9 @@
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { fetch } from "undici";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 type AudioProject = {
 	id: number;
@@ -16,10 +19,16 @@ type MigrationResult = {
 	r2Url: string | null;
 };
 
-const AUDIO_PROJECTS_ENDPOINT =
-	process.env.AUDIO_PROJECTS_ENDPOINT ??
-	"https://mysite.labcat.nz/wp-json/wp/v2/audio-projects";
-const TARGET_PREFIX = process.env.R2_AUDIO_PROJECT_PREFIX ?? "audio-project";
+type FileConfig = Partial<{
+	R2_ACCESS_KEY_ID: string;
+	R2_SECRET_ACCESS_KEY: string;
+	R2_ACCOUNT_ID: string;
+	R2_BUCKET_NAME: string;
+	R2_ENDPOINT: string;
+	R2_PUBLIC_BASE_URL: string;
+	R2_AUDIO_PROJECT_PREFIX: string;
+	AUDIO_PROJECTS_ENDPOINT: string;
+}>;
 
 function requireEnv(name: string): string {
 	const value = process.env[name];
@@ -62,18 +71,18 @@ function determineContentType(filename: string): string | undefined {
 	}
 }
 
-async function fetchAudioProjects(): Promise<AudioProject[]> {
-	const response = await fetch(AUDIO_PROJECTS_ENDPOINT);
+async function fetchAudioProjects(endpoint: string): Promise<AudioProject[]> {
+	const response = await fetch(endpoint);
 	if (!response.ok) {
 		throw new Error(
 			`Failed to fetch audio projects (${response.status} ${response.statusText})`
 		);
 	}
-	const data = (await response.json()) as unknown;
-	if (!Array.isArray(data)) {
+	const responseBody = (await response.json()) as unknown;
+	if (!Array.isArray(responseBody)) {
 		throw new Error("Unexpected audio projects payload: not an array");
 	}
-	return data as AudioProject[];
+	return responseBody as AudioProject[];
 }
 
 function collectImageUrls(projects: AudioProject[]): string[] {
@@ -119,16 +128,62 @@ async function uploadToR2(
 	);
 }
 
+function resolveConfigPath(): string {
+	const __filename = fileURLToPath(import.meta.url);
+	const __dirname = path.dirname(__filename);
+	return path.resolve(__dirname, "migrate-audio-project-images.config.ts");
+}
+
+async function loadFileConfig(): Promise<FileConfig> {
+	const configPath = resolveConfigPath();
+	if (!existsSync(configPath)) {
+		return {};
+	}
+	const module = await import(pathToFileURL(configPath).href);
+	const candidate =
+		module.default ??
+		module.AUDIO_PROJECT_IMAGE_MIGRATION_CONFIG ??
+		module.config ??
+		module;
+	if (typeof candidate !== "object" || candidate === null) {
+		throw new Error(
+			"Invalid migration config: expected default export to be an object"
+		);
+	}
+	return candidate as FileConfig;
+}
+
+function getValue(name: keyof FileConfig & string, fileConfig: FileConfig): string {
+	const value = fileConfig[name];
+	if (value && value.trim().length > 0) {
+		return value;
+	}
+	return requireEnv(name);
+}
+
 async function migrate(): Promise<MigrationResult[]> {
-	const accessKeyId = requireEnv("R2_ACCESS_KEY_ID");
-	const secretAccessKey = requireEnv("R2_SECRET_ACCESS_KEY");
-	const accountId = requireEnv("R2_ACCOUNT_ID");
-	const bucketName = requireEnv("R2_BUCKET_NAME");
+	const fileConfig = await loadFileConfig();
+
+	const accessKeyId = getValue("R2_ACCESS_KEY_ID", fileConfig);
+	const secretAccessKey = getValue("R2_SECRET_ACCESS_KEY", fileConfig);
+	const accountId = getValue("R2_ACCOUNT_ID", fileConfig);
+	const bucketName = getValue("R2_BUCKET_NAME", fileConfig);
 
 	const endpoint =
-		process.env.R2_ENDPOINT ?? `https://${accountId}.r2.cloudflarestorage.com`;
-	const publicBaseUrl = process.env.R2_PUBLIC_BASE_URL ?? null;
-	const prefix = normalisePrefix(TARGET_PREFIX);
+		fileConfig.R2_ENDPOINT ??
+		process.env.R2_ENDPOINT ??
+		`https://${accountId}.r2.cloudflarestorage.com`;
+	const publicBaseUrl =
+		fileConfig.R2_PUBLIC_BASE_URL ?? process.env.R2_PUBLIC_BASE_URL ?? null;
+	const targetPrefix =
+		fileConfig.R2_AUDIO_PROJECT_PREFIX ??
+		process.env.R2_AUDIO_PROJECT_PREFIX ??
+		"audio-project";
+	const audioProjectsEndpoint =
+		fileConfig.AUDIO_PROJECTS_ENDPOINT ??
+		process.env.AUDIO_PROJECTS_ENDPOINT ??
+		"https://mysite.labcat.nz/wp-json/wp/v2/audio-projects";
+	const prefix = normalisePrefix(targetPrefix);
 
 	const s3 = new S3Client({
 		region: "auto",
@@ -139,7 +194,7 @@ async function migrate(): Promise<MigrationResult[]> {
 		},
 	});
 
-	const projects = await fetchAudioProjects();
+	const projects = await fetchAudioProjects(audioProjectsEndpoint);
 	const imageUrls = collectImageUrls(projects);
 	const results: MigrationResult[] = [];
 
