@@ -93,5 +93,5 @@ npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 
 
 ## Image Migration Proof of Concept
 
-- Copy `scripts/migrate-audio-project-images.config.example.ts` to `scripts/migrate-audio-project-images.config.ts`, add your R2 credentials (file is git-ignored), then run `pnpm migrate:audio-project-images`.
+- Copy `scripts/migrate-audio-project-images.config.example.ts` to `scripts/migrate-audio-project-images.config.ts`, add your R2 credentials (file is git-ignored), then run `pnpm migrate:audio-project-images` to mirror media for audio projects, animations, building-blocks, creative-coding, and pages into R2.
 - See `docs/migrate-audio-project-images-poc.md` for detailed setup, optional environment variable usage, and troubleshooting tips.

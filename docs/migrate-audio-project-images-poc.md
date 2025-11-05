@@ -1,17 +1,25 @@
-# Audio Project Image Migration (Proof of Concept)
+# Image Migration Script (Proof of Concept)
 
-This proof of concept migrates the three audio project images exposed by the WordPress endpoint at `https://mysite.labcat.nz/wp-json/wp/v2/audio-projects` into Cloudflare R2. Each image is uploaded into the `audio-project/` folder in the target bucket using its original filename.
+This script pulls media references from the WordPress REST API and uploads the files to Cloudflare R2. By default it processes the following endpoints and mirrors each image into the matching folder inside the bucket while keeping the original filename:
+
+| Endpoint | Default R2 folder |
+| --- | --- |
+| `https://mysite.labcat.nz/wp-json/wp/v2/audio-projects` | `audio-projects/` |
+| `https://mysite.labcat.nz/wp-json/wp/v2/animations?per_page=99` | `animations/` |
+| `https://mysite.labcat.nz/wp-json/wp/v2/building-blocks?per_page=99` | `building-blocks/` |
+| `https://mysite.labcat.nz/wp-json/wp/v2/creative-coding` | `creative-coding/` |
+| `https://mysite.labcat.nz/wp-json/wp/v2/pages` | `pages/` |
 
 ## Prerequisites
 
 - Node.js 18+ (for built-in `fetch` support).
 - A Cloudflare account with an existing R2 bucket.
 - API credentials (Access Key ID and Secret Access Key) with write access to the bucket.
-- The `wrangler` CLI is **not** required for this script; uploads use R2's S3-compatible API via `@aws-sdk/client-s3`.
+- The `wrangler` CLI is **not** required; uploads use the R2 S3-compatible API via `@aws-sdk/client-s3`.
 
-## Environment Variables
+## Configuration Options
 
-| Variable | Description |
+| Option | Description |
 | --- | --- |
 | `R2_ACCESS_KEY_ID` | Cloudflare R2 access key ID. |
 | `R2_SECRET_ACCESS_KEY` | Cloudflare R2 secret access key. |
@@ -19,13 +27,14 @@ This proof of concept migrates the three audio project images exposed by the Wor
 | `R2_BUCKET_NAME` | Name of the R2 bucket receiving the uploads. |
 | `R2_ENDPOINT` *(optional)* | Custom S3 endpoint URL. Defaults to `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`. |
 | `R2_PUBLIC_BASE_URL` *(optional)* | Public HTTP base URL for the bucket. Used to generate the mapping output. |
-| `R2_AUDIO_PROJECT_PREFIX` *(optional)* | Folder prefix within the bucket. Defaults to `audio-project`. |
-| `AUDIO_PROJECTS_ENDPOINT` *(optional)* | Source WordPress endpoint. Defaults to the production URL above. |
+| `R2_<SOURCE>_PREFIX` *(optional)* | Override the target folder for a source, e.g. `R2_ANIMATIONS_PREFIX`. |
+| `<SOURCE>_ENDPOINT` *(optional)* | Override the WordPress endpoint for a source, e.g. `CREATIVE_CODING_ENDPOINT`. |
+| `sources` *(optional config only)* | Provide a full custom list of sources to replace the defaults entirely.
 
 ### Local config file (recommended)
 
 1. Copy `scripts/migrate-audio-project-images.config.example.ts` to `scripts/migrate-audio-project-images.config.ts`.
-2. Fill in your Cloudflare R2 credentials and any optional overrides.
+2. Fill in your Cloudflare R2 credentials and adjust any overrides you need.
 3. The real config file is git-ignored so the secrets stay on your machine.
 
 ### Using environment variables
@@ -56,37 +65,36 @@ pnpm migrate:audio-project-images
 
 ### What the Script Does
 
-1. Fetches all audio projects from the WordPress REST endpoint.
-2. Collects unique image URLs from the `featuredImage` and `featuredImages` fields.
-3. Downloads each image.
-4. Uploads each image to Cloudflare R2 at `audio-project/<original-filename>`.
-5. Outputs a JSON array mapping each source URL to its new R2 object key (and optional public URL).
+1. Builds a list of sources and R2 folder prefixes from the config file, environment variables, or defaults.
+2. Fetches every record from each source endpoint and collects unique image URLs from the `featuredImage` and `featuredImages` fields.
+3. Downloads each image (only once per unique URL) and uploads it to Cloudflare R2 using the configured folder and original filename.
+4. Outputs a JSON array mapping each source URL to the new R2 object key (and optional public URL) alongside the source identifier.
 
 Example output:
 
 ```json
 [
   {
+    "source": "audio-projects",
     "sourceUrl": "https://mysite.labcat.nz/media/audio-project/labcat-plunderphonics-vol-1-the-genesis.webp",
-    "targetKey": "audio-project/labcat-plunderphonics-vol-1-the-genesis.webp",
-    "r2Url": "https://cdn.example.com/audio-project/labcat-plunderphonics-vol-1-the-genesis.webp"
+    "targetKey": "audio-projects/labcat-plunderphonics-vol-1-the-genesis.webp",
+    "r2Url": "https://cdn.example.com/audio-projects/labcat-plunderphonics-vol-1-the-genesis.webp"
   }
 ]
 ```
 
 ## Verifying the Upload
 
-- Use the Cloudflare dashboard or `aws s3 ls` (with the same credentials) to confirm the objects exist under `audio-project/`.
+- Use the Cloudflare dashboard or `aws s3 ls` (with the same credentials) to confirm the objects exist under the expected prefixes.
 - Optionally `curl` the `r2Url` value (if `R2_PUBLIC_BASE_URL` is set) to ensure the file is publicly reachable.
 
 ## Known Limitations
 
-- This script only migrates imagery referenced by the audio projects endpoint. Additional endpoints and fields will be handled in subsequent tasks.
 - Existing R2 objects are overwritten without confirmation.
-- No local copy of the mapping is persisted; capture the console output if you need to store it.
+- No local copy of the mapping is persisted; capture the console output if you need to store it elsewhere.
+- Only the `featuredImage` and `featuredImages` fields are scanned. Other embedded media references are ignored for now.
 
 ## Next Steps
 
-- Expand the migration to other content types (`pages`, `animations`, `building-blocks`, `creative-coding`).
-- Persist the URL mapping for use in API responses and content migration.
-- Integrate the migration process into deployment workflows or workers once validated.
+- Persist the URL mapping for use in API responses and broader content migration.
+- Integrate the migration process into automated deployment or worker flows once validated.
