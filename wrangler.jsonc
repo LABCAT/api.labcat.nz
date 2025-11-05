@@ -14,8 +14,7 @@
 		{
 			"binding": "DB",
 			"database_name": "labcat_nz",
-			"database_id": "00000000-0000-0000-0000-000000000000",
-			"migrations_dir": "./migrations"
+			"database_id": "4a7849e5-2a11-4960-8e69-182d8cbae859"
 		}
 	]
 	/**
