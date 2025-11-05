@@ -10,17 +10,22 @@
 		"drizzle:gen": "drizzle-kit generate",
 		"drizzle:check": "drizzle-kit check",
 		"db:migrate:dev": "wrangler d1 migrations apply labcat_nz --local",
-		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz --remote"
+		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz --remote",
+		"migrate:audio-project-images": "tsx scripts/migrate-audio-project-images.ts"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.922.0",
+		"drizzle-orm": "^0.33.0",
 		"hono": "^4.9.0",
-		"drizzle-orm": "^0.33.0"
+		"undici": "^7.16.0"
 	},
 	"devDependencies": {
 		"@hono/vite-build": "^1.2.0",
 		"@hono/vite-dev-server": "^0.18.2",
+		"@types/node": "^24.10.0",
+		"drizzle-kit": "^0.24.0",
+		"tsx": "^4.20.6",
 		"vite": "^6.3.5",
-		"wrangler": "^4.28.1",
-		"drizzle-kit": "^0.24.0"
+		"wrangler": "^4.28.1"
 	}
 }
