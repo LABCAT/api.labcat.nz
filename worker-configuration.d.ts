@@ -8,6 +8,7 @@ declare namespace Cloudflare {
 interface CloudflareBindings extends Cloudflare.Env {
   // D1 binding for Drizzle
   DB: D1Database
+  LABCAT_MIGRATION_TOKEN?: string
 }
 
 // Begin runtime types
