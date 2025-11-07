@@ -4,22 +4,14 @@ This proof of concept fetches published audio projects from the legacy WordPress
 
 - **Source endpoint:** `https://mysite.labcat.nz/wp-json/wp/v2/audio-projects`
 - **R2 target folder:** `audio-projects/` on `https://image.labcat.nz`
-- **Worker route:** `POST /admin/migrate/audio-projects/poc`
+- **Runtime:** local TypeScript script (`pnpm run migrate:audio-projects`)
 
-The route performs an idempotent upsert by slug. On first run it inserts all records; subsequent runs update any changed fields and refresh the R2 image URLs. The response summarises how many records were inserted or updated and lists the source → target image URL mappings.
+The script performs an idempotent upsert by slug. On first run it inserts all records; subsequent runs update any changed fields and refresh the R2 image URLs. The console output summarises how many records were inserted or updated and lists the source → target image URL mappings.
 
 ## Prerequisites
 
 - Local D1 database has been created and migrations applied (`pnpm run db:migrate:dev`)
-- `wrangler` is authenticated if you plan to run against remote infrastructure
-
-Optional but recommended for production:
-
-```bash
-wrangler secret put LABCAT_MIGRATION_TOKEN
-```
-
-Store a shared token and present it with the `x-labcat-migration-token` header when calling the route.
+- `wrangler` is authenticated if you plan to run against remote infrastructure (not required for the local POC)
 
 ## Running the migration locally
 
@@ -33,20 +25,14 @@ Store a shared token and present it with the `x-labcat-migration-token` header w
    pnpm run db:migrate:dev
    ```
 
-3. **Start the Pages dev server with a local D1 binding**
+3. **Run the migration**
    ```bash
-   pnpm run preview
+   pnpm run migrate:audio-projects
    ```
-   The worker listens on `http://localhost:8788` by default.
+   By default the script targets the local Wrangler database at `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite`.  
+   To point at a different SQLite file, pass `--db /absolute/path/to/database.sqlite`.
 
-4. **Trigger the migration**
-   ```bash
-   curl -X POST \
-     http://localhost:8788/admin/migrate/audio-projects/poc
-   ```
-   Add the `x-labcat-migration-token` header if the token secret is configured.
-
-5. **Verify the data (optional)**
+4. **Verify the data (optional)**
    ```bash
    npx wrangler d1 execute labcat_nz --local \
      --command "SELECT slug, featuredImage FROM audio_projects;"
@@ -57,22 +43,17 @@ Store a shared token and present it with the `x-labcat-migration-token` header w
 Successful execution returns:
 
 ```json
-{
-  "status": "ok",
-  "summary": {
-    "sourceCount": 3,
-    "migratedCount": 3,
-    "inserted": 3,
-    "updated": 0,
-    "imageMappings": [
-      {
-        "source": "https://mysite.labcat.nz/media/audio-project/labcat-plunderphonics-vol-2-metamorphosis.webp",
-        "target": "https://image.labcat.nz/audio-projects/labcat-plunderphonics-vol-2-metamorphosis.webp"
-      }
-      // ...remaining mappings
-    ]
-  }
-}
+Audio Projects Migration Summary
+--------------------------------
+Database: /absolute/path/to/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/....sqlite
+Source items: 3
+Migrated items: 3
+Inserted rows: 3
+Updated rows: 0
+
+Image URL mappings:
+- https://mysite.labcat.nz/media/audio-project/labcat-plunderphonics-vol-2-metamorphosis.webp -> https://image.labcat.nz/audio-projects/labcat-plunderphonics-vol-2-metamorphosis.webp
+// ...remaining mappings
 ```
 
 Re-running the migration when the records already exist reports `updated` counts instead of `inserted`.
@@ -80,5 +61,5 @@ Re-running the migration when the records already exist reports `updated` counts
 ## Next steps
 
 - Extend the migration to handle additional content types (pages, animations, building blocks, creative coding).
-- Normalise additional media fields inside `content` once the proof of concept is validated.
+- Extend image replacement to inline media within the `content` field.
 - Integrate with automated workflows (Workers CRON or CI scripts) once the approach is accepted.

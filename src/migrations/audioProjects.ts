@@ -1,7 +1,3 @@
-import { eq } from 'drizzle-orm'
-import type { Database } from '../db/client'
-import { audioProjects } from '../db/schema'
-
 const AUDIO_PROJECTS_SOURCE =
   'https://mysite.labcat.nz/wp-json/wp/v2/audio-projects'
 const R2_BASE_URL = 'https://image.labcat.nz'
@@ -20,7 +16,7 @@ type WordPressAudioProject = {
   reactComponent?: string | null
 }
 
-type MigratedAudioProject = {
+export type MigratedAudioProject = {
   slug: string
   status: string
   type: string
@@ -32,11 +28,10 @@ type MigratedAudioProject = {
   modified: string
 }
 
-type MigrationSummary = {
+export type MigrationFetchResult = {
   sourceCount: number
   migratedCount: number
-  inserted: number
-  updated: number
+  normalizedProjects: MigratedAudioProject[]
   imageMappings: Array<{ source: string; target: string }>
 }
 
@@ -47,9 +42,7 @@ export class MigrationError extends Error {
   }
 }
 
-export async function migrateAudioProjects(
-  db: Database
-): Promise<MigrationSummary> {
+export async function fetchNormalizedAudioProjects(): Promise<MigrationFetchResult> {
   const response = await fetch(AUDIO_PROJECTS_SOURCE)
   if (!response.ok) {
     throw new MigrationError(
@@ -59,69 +52,12 @@ export async function migrateAudioProjects(
 
   const rawProjects = (await response.json()) as WordPressAudioProject[]
   const normalized = rawProjects.map(normalizeAudioProject)
-
-  let inserted = 0
-  let updated = 0
-  const imageMappings: Array<{ source: string; target: string }> = []
-
-  normalized.forEach((project, index) => {
-    const source = rawProjects[index]
-
-    if (project.featuredImage && source?.featuredImage) {
-      imageMappings.push({
-        source: source.featuredImage,
-        target: project.featuredImage
-      })
-    }
-
-    if (project.featuredImages && Array.isArray(source?.featuredImages)) {
-      const originalImages = source.featuredImages
-      const convertedImages = project.featuredImages
-
-      for (
-        let imageIndex = 0;
-        imageIndex < Math.min(originalImages.length, convertedImages.length);
-        imageIndex += 1
-      ) {
-        imageMappings.push({
-          source: originalImages[imageIndex],
-          target: convertedImages[imageIndex]
-        })
-      }
-    }
-  })
-
-  for (const project of normalized) {
-    const existingRecord = await db
-      .select({ id: audioProjects.id })
-      .from(audioProjects)
-      .where(eq(audioProjects.slug, project.slug))
-      .limit(1)
-
-    if (existingRecord.length > 0) {
-      await db
-        .update(audioProjects)
-        .set({
-          status: project.status,
-          type: project.type,
-          title: project.title,
-          featuredImage: project.featuredImage,
-          featuredImages: project.featuredImages,
-          content: project.content
-        })
-        .where(eq(audioProjects.id, existingRecord[0].id))
-      updated += 1
-    } else {
-      await db.insert(audioProjects).values(project)
-      inserted += 1
-    }
-  }
+  const imageMappings = createImageMappings(rawProjects, normalized)
 
   return {
     sourceCount: rawProjects.length,
     migratedCount: normalized.length,
-    inserted,
-    updated,
+    normalizedProjects: normalized,
     imageMappings
   }
 }
@@ -154,7 +90,7 @@ function convertImageArray(values?: string[] | null): string[] | null {
   return converted.length > 0 ? converted : null
 }
 
-function convertImageUrl(value?: string | null): string | null {
+export function convertImageUrl(value?: string | null): string | null {
   if (!value) {
     return null
   }
@@ -191,4 +127,41 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .trim()
+}
+
+function createImageMappings(
+  raw: WordPressAudioProject[],
+  normalized: MigratedAudioProject[]
+): Array<{ source: string; target: string }> {
+  const mappings: Array<{ source: string; target: string }> = []
+
+  normalized.forEach((project, index) => {
+    const sourceProject = raw[index]
+    if (!sourceProject) {
+      return
+    }
+
+    if (project.featuredImage && sourceProject.featuredImage) {
+      mappings.push({
+        source: sourceProject.featuredImage,
+        target: project.featuredImage
+      })
+    }
+
+    if (
+      project.featuredImages &&
+      Array.isArray(sourceProject.featuredImages) &&
+      sourceProject.featuredImages.length > 0
+    ) {
+      for (let i = 0; i < project.featuredImages.length; i += 1) {
+        const targetImage = project.featuredImages[i]
+        const sourceImage = sourceProject.featuredImages[i]
+        if (targetImage && sourceImage) {
+          mappings.push({ source: sourceImage, target: targetImage })
+        }
+      }
+    }
+  })
+
+  return mappings
 }
