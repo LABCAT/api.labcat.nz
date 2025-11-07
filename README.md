@@ -90,3 +90,7 @@ npx wrangler d1 execute labcat_nz --local --command="SELECT * FROM pages LIMIT 5
 # Production
 npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 5;"
 ```
+
+## Migration Proof of Concepts
+
+- [Audio Projects Migration POC](docs/audio-projects-migration-poc.md) — Fetches audio projects from WordPress, rewrites featured image URLs to the Cloudflare R2 bucket, and upserts the results into D1 via Drizzle.
