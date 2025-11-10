@@ -11,7 +11,8 @@
 		"drizzle:check": "drizzle-kit check",
 		"db:migrate:dev": "wrangler d1 migrations apply labcat_nz --local",
 		"db:migrate:prod": "wrangler d1 migrations apply labcat_nz --remote",
-		"migrate:audio-projects": "tsx src/scripts/migrate-audio-projects.ts"
+		"migrate:content": "tsx src/scripts/migrate-content.ts",
+		"migrate:audio-projects": "pnpm run migrate:content"
 	},
 	"dependencies": {
 		"hono": "^4.9.0",
