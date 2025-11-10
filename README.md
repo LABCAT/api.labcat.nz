@@ -90,3 +90,15 @@ npx wrangler d1 execute labcat_nz --local --command="SELECT * FROM pages LIMIT 5
 # Production
 npx wrangler d1 execute labcat_nz --remote --command="SELECT * FROM pages LIMIT 5;"
 ```
+
+## Public API Endpoints
+
+The worker exposes read-only JSON endpoints that mirror the legacy WordPress structure and read from Cloudflare D1 via Drizzle:
+
+- `GET /pages`
+- `GET /building-blocks`
+- `GET /animations`
+- `GET /creative-coding`
+- `GET /audio-projects`
+
+Each endpoint returns an array of records with `title.rendered`, `content.rendered` (where applicable), feature image metadata, and timestamps sourced from the migrated content. No authentication is required.
