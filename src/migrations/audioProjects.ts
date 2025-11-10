@@ -1,6 +1,10 @@
+import { eq } from 'drizzle-orm'
+import type { Database } from '../db/client'
+import { audioProjects } from '../db/schema'
+
 const AUDIO_PROJECTS_SOURCE =
   'https://mysite.labcat.nz/wp-json/wp/v2/audio-projects'
-const R2_BASE_URL = 'https://image.labcat.nz'
+const R2_BASE_URL = 'https://images.labcat.nz'
 const AUDIO_PROJECTS_FOLDER = 'audio-projects'
 
 type WordPressAudioProject = {
@@ -35,6 +39,14 @@ export type MigrationFetchResult = {
   imageMappings: Array<{ source: string; target: string }>
 }
 
+export type MigrationSummary = {
+  sourceCount: number
+  migratedCount: number
+  inserted: number
+  updated: number
+  imageMappings: Array<{ source: string; target: string }>
+}
+
 export class MigrationError extends Error {
   constructor(message: string, readonly cause?: unknown) {
     super(message)
@@ -58,6 +70,53 @@ export async function fetchNormalizedAudioProjects(): Promise<MigrationFetchResu
     sourceCount: rawProjects.length,
     migratedCount: normalized.length,
     normalizedProjects: normalized,
+    imageMappings
+  }
+}
+
+export async function migrateAudioProjects(db: Database): Promise<MigrationSummary> {
+  const {
+    normalizedProjects,
+    imageMappings,
+    sourceCount,
+    migratedCount
+  } = await fetchNormalizedAudioProjects()
+
+  let inserted = 0
+  let updated = 0
+
+  for (const project of normalizedProjects) {
+    const existingRecord = await db
+      .select({ id: audioProjects.id })
+      .from(audioProjects)
+      .where(eq(audioProjects.slug, project.slug))
+      .limit(1)
+
+    if (existingRecord.length > 0) {
+      await db
+        .update(audioProjects)
+        .set({
+          status: project.status,
+          type: project.type,
+          title: project.title,
+          featuredImage: project.featuredImage,
+          featuredImages: project.featuredImages,
+          content: project.content,
+          modified: project.modified
+        })
+        .where(eq(audioProjects.id, existingRecord[0].id))
+      updated += 1
+    } else {
+      await db.insert(audioProjects).values(project)
+      inserted += 1
+    }
+  }
+
+  return {
+    sourceCount,
+    migratedCount,
+    inserted,
+    updated,
     imageMappings
   }
 }

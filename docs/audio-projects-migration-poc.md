@@ -4,38 +4,39 @@ This proof of concept fetches published audio projects from the legacy WordPress
 
 - **Source endpoint:** `https://mysite.labcat.nz/wp-json/wp/v2/audio-projects`
 - **R2 target folder:** `audio-projects/` on `https://image.labcat.nz`
-- **Runtime:** local TypeScript script (`pnpm run migrate:audio-projects`)
+- **Runtime:** production migration script (`pnpm run migrate:audio-projects`)
 
 The script performs an idempotent upsert by slug. On first run it inserts all records; subsequent runs update any changed fields and refresh the R2 image URLs. The console output summarises how many records were inserted or updated and lists the source → target image URL mappings.
 
 ## Prerequisites
 
-- Local D1 database has been created and migrations applied (`pnpm run db:migrate:dev`)
-- `wrangler` is authenticated if you plan to run against remote infrastructure (not required for the local POC)
-
-## Running the migration locally
-
-1. **Install dependencies**
+1. Install dependencies
    ```bash
    pnpm install
    ```
 
-2. **Apply database migrations**
+2. Authenticate Wrangler with the production Cloudflare account
    ```bash
-   pnpm run db:migrate:dev
+   npx wrangler login
    ```
 
-3. **Run the migration**
+3. Confirm the D1 binding points to production
+   ```bash
+   npx wrangler d1 execute labcat_nz --remote --command "SELECT 1;"
+   ```
+
+## Running the migration
+
+1. **Run the migration (targets production D1)**
    ```bash
    pnpm run migrate:audio-projects
    ```
-   By default the script targets the local Wrangler database at `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite`.  
-   To point at a different SQLite file, pass `--db /absolute/path/to/database.sqlite`.
+   The script calls `wrangler d1 execute labcat_nz --remote` under the hood. No additional flags are required for production.
 
-4. **Verify the data (optional)**
+2. **Verify the data (optional)**
    ```bash
-   npx wrangler d1 execute labcat_nz --local \
-     --command "SELECT slug, featuredImage FROM audio_projects;"
+   npx wrangler d1 execute labcat_nz --remote \
+     --command "SELECT slug, modified FROM audio_projects ORDER BY modified DESC LIMIT 5;"
    ```
 
 ## Expected output
@@ -45,7 +46,7 @@ Successful execution returns:
 ```json
 Audio Projects Migration Summary
 --------------------------------
-Database: /absolute/path/to/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/....sqlite
+Target database: production (remote)
 Source items: 3
 Migrated items: 3
 Inserted rows: 3

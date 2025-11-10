@@ -1,92 +1,67 @@
 #!/usr/bin/env tsx
 
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
-import { createRequire } from 'node:module'
-import initSqlJs from 'sql.js'
-import { drizzle } from 'drizzle-orm/sql-js'
-import { eq } from 'drizzle-orm'
-import { audioProjects } from '../db/schema'
+import { spawnSync } from 'node:child_process'
 import {
   fetchNormalizedAudioProjects,
-  MigrationError
+  MigrationError,
+  type MigratedAudioProject
 } from '../migrations/audioProjects'
 
-const require = createRequire(import.meta.url)
-
-type ResultRow = {
-  id: number
-}
-
-type AggregatedResult = {
-  sourceCount: number
-  migratedCount: number
-  inserted: number
-  updated: number
-  imageMappings: Array<{ source: string; target: string }>
+type WranglerQuerySuccess = {
+  success: true
+  result: Array<{
+    success: true
+    results?: Array<Record<string, unknown>>
+  }>
 }
 
 async function main() {
   try {
-    const dbPath = resolveDatabasePath()
-    const SQL = await initSqlJs({
-      locateFile: (file) => path.join(getSqlJsDir(), file)
-    })
+    ensureWranglerAvailable()
 
-    const databaseFile = fs.existsSync(dbPath)
-      ? new Uint8Array(fs.readFileSync(dbPath))
-      : undefined
+    const {
+      normalizedProjects,
+      imageMappings,
+      sourceCount,
+      migratedCount
+    } = await fetchNormalizedAudioProjects()
 
-    const sqlite = databaseFile ? new SQL.Database(databaseFile) : new SQL.Database()
-    const db = drizzle(sqlite)
-
-    const fetchResult = await fetchNormalizedAudioProjects()
-    const { normalizedProjects, imageMappings, sourceCount, migratedCount } =
-      fetchResult
-
-    let inserted = 0
-    let updated = 0
-
-    for (const project of normalizedProjects) {
-      const existing = (await db
-        .select({ id: audioProjects.id })
-        .from(audioProjects)
-        .where(eq(audioProjects.slug, project.slug))
-        .limit(1)) as ResultRow[]
-
-      if (existing.length > 0) {
-        await db
-          .update(audioProjects)
-          .set({
-            status: project.status,
-            type: project.type,
-            title: project.title,
-            featuredImage: project.featuredImage,
-            featuredImages: project.featuredImages,
-            content: project.content
-          })
-          .where(eq(audioProjects.id, existing[0].id))
-        updated += 1
-      } else {
-        await db.insert(audioProjects).values(project)
-        inserted += 1
-      }
+    if (normalizedProjects.length === 0) {
+      console.log('No audio projects returned from WordPress. Nothing to migrate.')
+      return
     }
 
-    const exported = sqlite.export()
-    fs.writeFileSync(dbPath, Buffer.from(exported))
-    sqlite.close()
+    const existingSlugs = await fetchExistingSlugs(
+      normalizedProjects.map((project) => project.slug)
+    )
 
-    const summary: AggregatedResult = {
+    const inserted = normalizedProjects.reduce((count, project) => {
+      return existingSlugs.has(project.slug) ? count : count + 1
+    }, 0)
+    const updated = normalizedProjects.length - inserted
+
+    const sql = normalizedProjects
+      .map((project) => buildUpsertStatement(project))
+      .join('\n\n')
+
+    const sqlFilePath = writeTempSqlFile(sql)
+    try {
+      executeSqlFile(sqlFilePath)
+    } finally {
+      fs.rmSync(sqlFilePath, { force: true })
+    }
+
+    logSummary({
       sourceCount,
       migratedCount,
       inserted,
       updated,
       imageMappings
-    }
-
-    logSummary(summary, dbPath)
+    })
   } catch (error) {
     if (error instanceof MigrationError) {
       console.error(`[audio-projects] ${error.message}`)
@@ -97,83 +72,199 @@ async function main() {
       return
     }
 
-    console.error('[audio-projects] Migration failed')
-    console.error(error)
+    if (error instanceof Error) {
+      console.error('[audio-projects] Migration failed')
+      console.error(error.message)
+    } else {
+      console.error('[audio-projects] Migration failed with unknown error')
+      console.error(error)
+    }
     process.exitCode = 1
   }
 }
 
-function resolveDatabasePath(): string {
-  const args = process.argv.slice(2)
-  const dbArgIndex = args.findIndex((arg) => arg === '--db')
+function ensureWranglerAvailable(): void {
+  const result = spawnSync('pnpm', ['exec', 'wrangler', '--version'], {
+    stdio: 'ignore'
+  })
 
-  if (dbArgIndex !== -1) {
-    const providedPath = args[dbArgIndex + 1]
-    if (!providedPath) {
-      throw new Error('Missing value for --db option')
-    }
-    const resolved = path.resolve(providedPath)
-    ensureParentDirectory(resolved)
-    return resolved
+  if (result.status !== 0) {
+    throw new Error(
+      'Wrangler CLI is not available. Ensure dependencies are installed and you are authenticated with Cloudflare.'
+    )
+  }
+}
+
+async function fetchExistingSlugs(slugs: string[]): Promise<Set<string>> {
+  if (slugs.length === 0) {
+    return new Set()
   }
 
-  const defaultPath = findLocalWranglerDatabase()
-  if (!defaultPath) {
+  const uniqueSlugs = Array.from(new Set(slugs))
+  const chunkSize = 100
+  const existing = new Set<string>()
+
+  for (let index = 0; index < uniqueSlugs.length; index += chunkSize) {
+    const chunk = uniqueSlugs.slice(index, index + chunkSize)
+    const slugList = chunk.map((slug) => sqlString(slug)).join(', ')
+    const command = `SELECT slug FROM audio_projects WHERE slug IN (${slugList});`
+    const rows = runWranglerQuery(command)
+
+    rows.forEach((row) => {
+      const slug = row.slug
+      if (typeof slug === 'string') {
+        existing.add(slug)
+      }
+    })
+  }
+
+  return existing
+}
+
+function runWranglerQuery(sql: string): Array<Record<string, unknown>> {
+  const result = spawnSync(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      'd1',
+      'execute',
+      'labcat_nz',
+      '--remote',
+      '--json',
+      '--command',
+      sql
+    ],
+    {
+      encoding: 'utf8'
+    }
+  )
+
+  if (result.status !== 0) {
     throw new Error(
       [
-        'Could not find a local D1 database file.',
-        'Run `pnpm run db:migrate:dev` first, or supply a path with `--db /path/to/database.sqlite`.'
-      ].join(' ')
+        'Wrangler query failed.',
+        result.stderr?.trim() ? `\n${result.stderr.trim()}` : ''
+      ].join('')
     )
   }
 
-  return defaultPath
+  const output = result.stdout.trim()
+  if (!output) {
+    return []
+  }
+
+  const parsed = JSON.parse(output)
+
+  if (Array.isArray(parsed)) {
+    const [firstResult] = parsed
+    if (!firstResult?.success) {
+      throw new Error('Wrangler query reported failure.')
+    }
+    return firstResult.results ?? []
+  }
+
+  const typed = parsed as WranglerQuerySuccess
+  const [firstResult] = typed.result ?? []
+
+  if (!typed.success || !firstResult?.success) {
+    throw new Error('Unexpected Wrangler JSON response.')
+  }
+
+  return firstResult.results ?? []
 }
 
-function findLocalWranglerDatabase(): string | undefined {
-  const directory = path.resolve(
-    '.wrangler/state/v3/d1/miniflare-D1DatabaseObject'
+function buildUpsertStatement(project: MigratedAudioProject): string {
+  const featuredImages = project.featuredImages
+    ? JSON.stringify(project.featuredImages)
+    : null
+
+  return [
+    'INSERT INTO audio_projects (',
+    '  slug, status, type, title, featuredImage, featuredImages, content, created, modified',
+    ') VALUES (',
+    [
+      sqlString(project.slug),
+      sqlString(project.status),
+      sqlString(project.type),
+      sqlString(project.title),
+      sqlString(project.featuredImage),
+      sqlString(featuredImages),
+      sqlString(project.content),
+      sqlString(project.created),
+      sqlString(project.modified)
+    ].join(', '),
+    ') ON CONFLICT(slug) DO UPDATE SET',
+    '  status = excluded.status,',
+    '  type = excluded.type,',
+    '  title = excluded.title,',
+    '  featuredImage = excluded.featuredImage,',
+    '  featuredImages = excluded.featuredImages,',
+    '  content = excluded.content,',
+    '  modified = excluded.modified;'
+  ].join('\n')
+}
+
+function sqlString(value: string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return 'NULL'
+  }
+
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+function writeTempSqlFile(sql: string): string {
+  const filePath = path.join(
+    os.tmpdir(),
+    `audio-projects-migration-${Date.now()}.sql`
+  )
+  fs.writeFileSync(filePath, sql, 'utf8')
+  return filePath
+}
+
+function executeSqlFile(filePath: string): void {
+  const result = spawnSync(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      'd1',
+      'execute',
+      'labcat_nz',
+      '--remote',
+      '--file',
+      filePath
+    ],
+    { stdio: 'inherit' }
   )
 
-  if (!fs.existsSync(directory)) {
-    return undefined
-  }
-
-  const files = fs.readdirSync(directory)
-  const sqliteFile = files.find((file) => file.endsWith('.sqlite'))
-
-  if (!sqliteFile) {
-    return undefined
-  }
-
-  return path.join(directory, sqliteFile)
-}
-
-function ensureParentDirectory(filePath: string): void {
-  const dir = path.dirname(filePath)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  if (result.status !== 0) {
+    throw new Error('Wrangler execution failed.')
   }
 }
 
-function getSqlJsDir(): string {
-  const packageRoot = path.dirname(require.resolve('sql.js/package.json'))
-  return path.join(packageRoot, 'dist')
+type Summary = {
+  sourceCount: number
+  migratedCount: number
+  inserted: number
+  updated: number
+  imageMappings: Array<{ source: string; target: string }>
 }
 
-function logSummary(result: AggregatedResult, dbPath: string): void {
+function logSummary(summary: Summary): void {
   console.log('Audio Projects Migration Summary')
   console.log('--------------------------------')
-  console.log(`Database: ${dbPath}`)
-  console.log(`Source items: ${result.sourceCount}`)
-  console.log(`Migrated items: ${result.migratedCount}`)
-  console.log(`Inserted rows: ${result.inserted}`)
-  console.log(`Updated rows: ${result.updated}`)
+  console.log('Target database: production (remote)')
+  console.log(`Source items: ${summary.sourceCount}`)
+  console.log(`Migrated items: ${summary.migratedCount}`)
+  console.log(`Inserted rows: ${summary.inserted}`)
+  console.log(`Updated rows: ${summary.updated}`)
   console.log('')
   console.log('Image URL mappings:')
-  result.imageMappings.forEach((mapping) => {
+  summary.imageMappings.forEach((mapping) => {
     console.log(`- ${mapping.source} -> ${mapping.target}`)
   })
 }
 
 await main()
+
