@@ -31,7 +31,7 @@ app.get('/', (c) => {
 app.get('/pages', async (c) => {
   try {
     const db = getDb(c.env.DB)
-    const rows = await db.select().from(pages).orderBy(asc(pages.slug))
+    const rows = await db.select().from(pages).orderBy(asc(pages.sort))
     const payload = rows.map((row) =>
       formatResponse(row, {
         reactComponent: row.reactComponent ?? null
@@ -49,7 +49,7 @@ app.get('/building-blocks', async (c) => {
     const rows = await db
       .select()
       .from(buildingBlocks)
-      .orderBy(asc(buildingBlocks.slug))
+      .orderBy(asc(buildingBlocks.sort))
 
     return c.json(rows.map((row) => formatResponse(row)))
   } catch (error) {
@@ -60,7 +60,7 @@ app.get('/building-blocks', async (c) => {
 app.get('/animations', async (c) => {
   try {
     const db = getDb(c.env.DB)
-    const rows = await db.select().from(animations).orderBy(asc(animations.slug))
+    const rows = await db.select().from(animations).orderBy(asc(animations.sort))
 
     const payload = rows.map((row) =>
       formatResponse(row, {
@@ -80,7 +80,7 @@ app.get('/creative-coding', async (c) => {
     const rows = await db
       .select()
       .from(creativeCoding)
-      .orderBy(asc(creativeCoding.slug))
+      .orderBy(asc(creativeCoding.sort))
 
     const payload = rows.map((row) =>
       formatResponse(row, {
@@ -100,7 +100,7 @@ app.get('/audio-projects', async (c) => {
     const rows = await db
       .select()
       .from(audioProjects)
-      .orderBy(asc(audioProjects.slug))
+      .orderBy(asc(audioProjects.sort))
 
     const payload = rows.map((row) =>
       formatResponse(row, {

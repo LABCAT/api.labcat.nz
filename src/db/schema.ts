@@ -11,6 +11,7 @@ function commonColumns() {
     status: text('status').notNull(),
     type: text('type').notNull(),
     title: text('title').notNull(),
+    sort: integer('sort').notNull().default(0),
     featuredImage: text('featuredImage'),
     // Store JSON array as a string column; Drizzle will type it as string[] when used
     featuredImages: text('featuredImages', { mode: 'json' }).$type<string[] | null>()
